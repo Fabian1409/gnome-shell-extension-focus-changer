@@ -1,17 +1,20 @@
 'use strict';
 
-const { Shell, Meta } = imports.gi;
-const Main = imports.ui.main;
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
+import Meta from 'gi://Meta';
+import Shell from 'gi://Shell';
+
+import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 const SCHEMA_FOCUS_UP = 'focus-up';
 const SCHEMA_FOCUS_DOWN = 'focus-down';
 const SCHEMA_FOCUS_RIGHT = 'focus-right';
 const SCHEMA_FOCUS_LEFT = 'focus-left';
 
-class FocusChanger {
-    constructor() {
+export default class FocusChanger extends Extension {
+    constructor(metadata) {
+        super(metadata);
         this._workspaceManager = global.workspace_manager;
         this._keyFocusUpId = null;
         this._keyFocusDownId = null;
@@ -21,99 +24,138 @@ class FocusChanger {
     }
 
     changeFocus(id) {
-        const { activeWindow, activeRect } = this._getActiveWindow();
+        const {activeWindow, activeRect} = this._getActiveWindow();
         if (!activeWindow) {
             this._activeWindow = null;
             return;
         }
 
         this._activeWindow = activeWindow;
-        const bestCandidate = this._getBestCandidate(id, activeWindow.get_monitor(), activeRect);
-        if (bestCandidate)
-            bestCandidate.activate(global.get_current_time());
+        const bestCandidate = this._getBestCandidate(
+            id,
+            activeWindow.get_monitor(),
+            activeRect
+        );
+        if (bestCandidate) bestCandidate.activate(global.get_current_time());
     }
 
     _getBestCandidate(id, monitor, activeRect) {
         const windows = this._getAllWindows(monitor);
-        const { x, y } = activeRect;
+        const x = this._getCenterX(activeRect);
+        const y = this._getCenterY(activeRect);
         let bestCandidate = null;
+
         switch (id) {
-        case SCHEMA_FOCUS_UP:
-            windows.forEach(w => {
-                const rect = w.get_frame_rect();
-                if (rect.y < y) {
-                    if (!bestCandidate) {
-                        bestCandidate = w;
-                    } else {
-                        const bestRect = bestCandidate.get_frame_rect();
-                        if (rect.x === bestRect.x && rect.y > bestRect.y)
+            case SCHEMA_FOCUS_UP:
+                windows.forEach(w => {
+                    const rect = w.get_frame_rect();
+                    if (this._getCenterY(rect) < y) {
+                        if (!bestCandidate) {
                             bestCandidate = w;
-                        else if (
-                            rect.x !== bestRect.x &&
-                Math.abs(activeRect.x - rect.x) < Math.abs(activeRect.x - bestRect.x)
-                        )
-                            bestCandidate = w;
+                        } else {
+                            const bestRect = bestCandidate.get_frame_rect();
+                            if (
+                                this._getCenterX(rect) ===
+                                    this._getCenterX(bestRect) &&
+                                this._getCenterY(rect) >
+                                    this._getCenterY(bestRect)
+                            )
+                                bestCandidate = w;
+                            else if (
+                                this._getCenterX(rect) !==
+                                    this._getCenterX(bestRect) &&
+                                Math.abs(x - this._getCenterX(rect)) <
+                                    Math.abs(x - this._getCenterX(bestRect))
+                            )
+                                bestCandidate = w;
+                        }
                     }
-                }
-            });
-            break;
-        case SCHEMA_FOCUS_DOWN:
-            windows.forEach(w => {
-                const rect = w.get_frame_rect();
-                if (rect.y > y) {
-                    if (!bestCandidate) {
-                        bestCandidate = w;
-                    } else {
-                        const bestRect = bestCandidate.get_frame_rect();
-                        if (rect.x === bestRect.x && rect.y < bestRect.y)
+                });
+                break;
+            case SCHEMA_FOCUS_DOWN:
+                windows.forEach(w => {
+                    const rect = w.get_frame_rect();
+                    if (this._getCenterY(rect) > y) {
+                        if (!bestCandidate) {
                             bestCandidate = w;
-                        else if (
-                            rect.x !== bestRect.x &&
-                Math.abs(activeRect.x - rect.x) < Math.abs(activeRect.x - bestRect.x)
-                        )
-                            bestCandidate = w;
+                        } else {
+                            const bestRect = bestCandidate.get_frame_rect();
+                            if (
+                                this._getCenterX(rect) ===
+                                    this._getCenterX(bestRect) &&
+                                this._getCenterY(rect) <
+                                    this._getCenterY(bestRect)
+                            )
+                                bestCandidate = w;
+                            else if (
+                                this._getCenterX(rect) !==
+                                    this._getCenterX(bestRect) &&
+                                Math.abs(x - this._getCenterX(rect)) <
+                                    Math.abs(x - this._getCenterX(bestRect))
+                            )
+                                bestCandidate = w;
+                        }
                     }
-                }
-            });
-            break;
-        case SCHEMA_FOCUS_RIGHT:
-            windows.forEach(w => {
-                const rect = w.get_frame_rect();
-                if (rect.x > x) {
-                    if (!bestCandidate) {
-                        bestCandidate = w;
-                    } else {
-                        const bestRect = bestCandidate.get_frame_rect();
-                        if (rect.y === bestRect.y && rect.x < bestRect.x)
+                });
+                break;
+            case SCHEMA_FOCUS_RIGHT:
+                windows.forEach(w => {
+                    const rect = w.get_frame_rect();
+                    if (this._getCenterX(rect) > x) {
+                        if (!bestCandidate) {
                             bestCandidate = w;
-                        else if (
-                            rect.y !== bestRect.y &&
-                Math.abs(activeRect.y - rect.y) < Math.abs(activeRect.y - bestRect.y)
-                        )
-                            bestCandidate = w;
+                        } else {
+                            const bestRect = bestCandidate.get_frame_rect();
+                            if (
+                                this._getCenterY(rect) ===
+                                    this._getCenterY(bestRect) &&
+                                this._getCenterX(rect) <
+                                    this._getCenterX(bestRect)
+                            )
+                                bestCandidate = w;
+                            else if (
+                                this._getCenterY(rect) !==
+                                    this._getCenterY(bestRect) &&
+                                Math.abs(y - this._getCenterY(rect)) <
+                                    Math.abs(
+                                        this._getCenterY(activeRect) -
+                                            this._getCenterY(bestRect)
+                                    )
+                            )
+                                bestCandidate = w;
+                        }
                     }
-                }
-            });
-            break;
-        case SCHEMA_FOCUS_LEFT:
-            windows.forEach(w => {
-                const rect = w.get_frame_rect();
-                if (rect.x < x) {
-                    if (!bestCandidate) {
-                        bestCandidate = w;
-                    } else {
-                        const bestRect = bestCandidate.get_frame_rect();
-                        if (rect.y === bestRect.y && rect.x > bestRect.x)
+                });
+                break;
+            case SCHEMA_FOCUS_LEFT:
+                windows.forEach(w => {
+                    const rect = w.get_frame_rect();
+                    if (this._getCenterX(rect) < x) {
+                        if (!bestCandidate) {
                             bestCandidate = w;
-                        else if (
-                            rect.y !== bestRect.y &&
-                Math.abs(activeRect.y - rect.y) < Math.abs(activeRect.y - bestRect.y)
-                        )
-                            bestCandidate = w;
+                        } else {
+                            const bestRect = bestCandidate.get_frame_rect();
+                            if (
+                                this._getCenterY(rect) ===
+                                    this._getCenterY(bestRect) &&
+                                this._getCenterX(rect) >
+                                    this._getCenterX(bestRect)
+                            )
+                                bestCandidate = w;
+                            else if (
+                                this._getCenterY(rect) !==
+                                    this._getCenterY(bestRect) &&
+                                Math.abs(y - this._getCenterY(rect)) <
+                                    Math.abs(
+                                        this._getCenterY(activeRect) -
+                                            this._getCenterY(bestRect)
+                                    )
+                            )
+                                bestCandidate = w;
+                        }
                     }
-                }
-            });
-            break;
+                });
+                break;
         }
 
         return bestCandidate;
@@ -122,7 +164,9 @@ class FocusChanger {
     _getAllWindows(monitor) {
         const workspace = this._workspaceManager.get_active_workspace();
         const windows = workspace.list_windows();
-        return windows.filter(w => w.get_monitor() === monitor && w.is_hidden() === false);
+        return windows.filter(
+            w => w.get_monitor() === monitor && w.is_hidden() === false
+        );
     }
 
     _getActiveWindow() {
@@ -140,7 +184,7 @@ class FocusChanger {
             }
         }
 
-        return { activeWindow: focusedWindow, activeRect: focusedWindowRect };
+        return {activeWindow: focusedWindow, activeRect: focusedWindowRect};
     }
 
     _bindShortcut() {
@@ -196,17 +240,15 @@ class FocusChanger {
     }
 
     enable() {
-        this._settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.focus-changer');
+        this._settings = this.getSettings(
+            'org.gnome.shell.extensions.focus-changer'
+        );
         this._bindShortcut();
     }
 
     disable() {
         this._unbindShortcut();
         this._settings = null;
+        this._activeWindow = null;
     }
-}
-
-// eslint-disable-next-line no-unused-vars
-function init() {
-    return new FocusChanger();
 }
